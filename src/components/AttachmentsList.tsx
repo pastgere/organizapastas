@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { FileText, Image as ImageIcon, File, Download, Trash2 } from "lucide-react";
+import { FileText, Image as ImageIcon, File, Download, Trash2, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { FilePreview } from "./FilePreview";
 
 interface Attachment {
   id: string;
@@ -21,6 +22,7 @@ interface AttachmentsListProps {
 export const AttachmentsList = ({ topicId, refreshTrigger }: AttachmentsListProps) => {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [previewFile, setPreviewFile] = useState<Attachment | null>(null);
 
   const fetchAttachments = async () => {
     try {
@@ -107,44 +109,67 @@ export const AttachmentsList = ({ topicId, refreshTrigger }: AttachmentsListProp
   }
 
   return (
-    <div className="space-y-2 mt-3">
-      <p className="text-sm font-medium text-muted-foreground">
-        {attachments.length} anexo{attachments.length !== 1 ? "s" : ""}
-      </p>
-      <div className="space-y-2">
-        {attachments.map((attachment) => (
-          <div
-            key={attachment.id}
-            className="flex items-center gap-3 rounded-lg border bg-card/50 p-3 text-sm"
-          >
-            {getFileIcon(attachment.file_type)}
-            <div className="flex-1 min-w-0">
-              <p className="font-medium truncate">{attachment.file_name}</p>
-              <p className="text-xs text-muted-foreground">
-                {(attachment.file_size / 1024).toFixed(1)} KB
-              </p>
+    <>
+      <div className="space-y-2 mt-3">
+        <p className="text-sm font-medium text-muted-foreground">
+          {attachments.length} anexo{attachments.length !== 1 ? "s" : ""}
+        </p>
+        <div className="space-y-2">
+          {attachments.map((attachment) => (
+            <div
+              key={attachment.id}
+              className="flex items-center gap-3 rounded-lg border bg-card/50 p-3 text-sm"
+            >
+              {getFileIcon(attachment.file_type)}
+              <div className="flex-1 min-w-0">
+                <p className="font-medium truncate">{attachment.file_name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {(attachment.file_size / 1024).toFixed(1)} KB
+                </p>
+              </div>
+              <div className="flex gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setPreviewFile(attachment)}
+                  className="h-8 w-8"
+                  title="Visualizar"
+                >
+                  <Eye className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleDownload(attachment)}
+                  className="h-8 w-8"
+                  title="Baixar"
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleDelete(attachment)}
+                  className="h-8 w-8 text-destructive hover:text-destructive"
+                  title="Excluir"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-            <div className="flex gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => handleDownload(attachment)}
-                className="h-8 w-8"
-              >
-                <Download className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => handleDelete(attachment)}
-                className="h-8 w-8 text-destructive hover:text-destructive"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
-    </div>
+
+      {previewFile && (
+        <FilePreview
+          isOpen={!!previewFile}
+          onClose={() => setPreviewFile(null)}
+          fileName={previewFile.file_name}
+          filePath={previewFile.file_path}
+          fileType={previewFile.file_type}
+        />
+      )}
+    </>
   );
 };
