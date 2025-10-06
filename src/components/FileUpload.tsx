@@ -12,11 +12,36 @@ interface FileUploadProps {
 export const FileUpload = ({ topicId, onUploadComplete }: FileUploadProps) => {
   const [uploading, setUploading] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const filesArray = Array.from(e.target.files);
       setSelectedFiles((prev) => [...prev, ...filesArray]);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) {
+      setSelectedFiles((prev) => [...prev, ...files]);
+      toast.success(`${files.length} arquivo(s) adicionado(s)`);
     }
   };
 
@@ -77,10 +102,29 @@ export const FileUpload = ({ topicId, onUploadComplete }: FileUploadProps) => {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
+      <div
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className={`relative rounded-lg border-2 border-dashed p-8 text-center transition-all ${
+          isDragging
+            ? "border-primary bg-primary/5 scale-[1.02]"
+            : "border-border bg-card/50"
+        }`}
+      >
+        <Upload className={`mx-auto h-12 w-12 mb-4 transition-colors ${
+          isDragging ? "text-primary" : "text-muted-foreground"
+        }`} />
+        <p className="text-sm font-medium mb-2">
+          {isDragging ? "Solte os arquivos aqui" : "Arraste arquivos para cá"}
+        </p>
+        <p className="text-xs text-muted-foreground mb-4">
+          ou clique no botão abaixo para selecionar
+        </p>
+        
         <label
           htmlFor="file-upload"
-          className="cursor-pointer inline-flex items-center gap-2 rounded-lg border-2 border-dashed border-border bg-card px-4 py-3 text-sm font-medium transition-colors hover:bg-accent/50"
+          className="cursor-pointer inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
         >
           <Upload className="h-4 w-4" />
           Selecionar Arquivos
@@ -94,13 +138,15 @@ export const FileUpload = ({ topicId, onUploadComplete }: FileUploadProps) => {
             disabled={uploading}
           />
         </label>
-        
-        {selectedFiles.length > 0 && (
-          <Button onClick={handleUpload} disabled={uploading}>
+      </div>
+
+      {selectedFiles.length > 0 && (
+        <div className="flex justify-end">
+          <Button onClick={handleUpload} disabled={uploading} size="lg">
             {uploading ? "Enviando..." : `Enviar ${selectedFiles.length} arquivo(s)`}
           </Button>
-        )}
-      </div>
+        </div>
+      )}
 
       {selectedFiles.length > 0 && (
         <div className="space-y-2">
