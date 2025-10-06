@@ -1,4 +1,4 @@
-import { Folder, MoreVertical, Trash2, Edit } from "lucide-react";
+import { Folder, MoreVertical, Trash2, Edit, Download } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ interface FolderCardProps {
   onClick: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onDownload?: () => void;
 }
 
 export const FolderCard = ({
@@ -26,6 +27,7 @@ export const FolderCard = ({
   onClick,
   onEdit,
   onDelete,
+  onDownload,
 }: FolderCardProps) => {
   const progress = totalTopics > 0 ? (completedTopics / totalTopics) * 100 : 0;
 
@@ -53,6 +55,12 @@ export const FolderCard = ({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            {onDownload && (
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDownload(); }}>
+                <Download className="mr-2 h-4 w-4" />
+                Baixar Pasta
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(); }}>
               <Edit className="mr-2 h-4 w-4" />
               Editar

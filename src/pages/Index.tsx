@@ -8,6 +8,7 @@ import { AuthForm } from "@/components/AuthForm";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { User, Session } from "@supabase/supabase-js";
+import { downloadFolderAsZip } from "@/utils/downloadFolder";
 
 interface Folder {
   id: string;
@@ -126,6 +127,27 @@ const Index = () => {
     }
   };
 
+  const handleDownloadFolder = async (folderId: string, folderName: string) => {
+    try {
+      toast.loading("Preparando download...");
+      const result = await downloadFolderAsZip(folderId, folderName);
+      
+      toast.dismiss();
+      
+      if (result.failedFiles > 0) {
+        toast.success(
+          `Download concluído! ${result.downloadedFiles} de ${result.totalFiles} arquivos baixados.`,
+          { description: `${result.failedFiles} arquivo(s) apresentaram erro.` }
+        );
+      } else {
+        toast.success(`Download concluído! ${result.downloadedFiles} arquivo(s) baixados.`);
+      }
+    } catch (error: any) {
+      toast.dismiss();
+      toast.error(error.message || "Erro ao baixar pasta");
+    }
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     toast.success("Logout realizado!");
@@ -215,6 +237,7 @@ const Index = () => {
                 onClick={() => navigate(`/folder/${folder.id}`)}
                 onEdit={() => { setEditingFolder(folder); setDialogOpen(true); }}
                 onDelete={() => handleDeleteFolder(folder.id)}
+                onDownload={() => handleDownloadFolder(folder.id, folder.name)}
               />
             ))}
           </div>
