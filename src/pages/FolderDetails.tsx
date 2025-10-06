@@ -1,98 +1,196 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Plus, Download } from "lucide-react";
+import { ArrowLeft, Plus, Download, Paperclip } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TopicItem, Topic } from "@/components/TopicItem";
 import { TopicDialog } from "@/components/TopicDialog";
+import { FileUpload } from "@/components/FileUpload";
+import { AttachmentsList } from "@/components/AttachmentsList";
 import { Progress } from "@/components/ui/progress";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-
-// Mock data - in a real app, this would come from a database
-const mockFolders = {
-  "1": {
-    id: "1",
-    name: "João Silva",
-    topics: [
-      { id: "t1", title: "Contrato Social", completed: true, attachments: 2 },
-      { id: "t2", title: "Documentação Fiscal", completed: false, attachments: 1 },
-      { id: "t3", title: "Certidões", completed: true, attachments: 3 },
-    ] as Topic[],
-  },
-};
+import type { User } from "@supabase/supabase-js";
 
 const FolderDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [topics, setTopics] = useState<Topic[]>(
-    mockFolders[id as keyof typeof mockFolders]?.topics || []
-  );
-  const [folderName] = useState(
-    mockFolders[id as keyof typeof mockFolders]?.name || "Pasta"
-  );
+  const [user, setUser] = useState<User | null>(null);
+  const [topics, setTopics] = useState<Topic[]>([]);
+  const [folderName, setFolderName] = useState("");
+  const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   const [editingTopic, setEditingTopic] = useState<Topic | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user);
+      if (!user) {
+        navigate("/");
+      }
+    });
+  }, [navigate]);
+
+  useEffect(() => {
+    if (user && id) {
+      fetchFolderData();
+    }
+  }, [user, id]);
+
+  const fetchFolderData = async () => {
+    try {
+      const { data: folder, error: folderError } = await supabase
+        .from("folders")
+        .select("name")
+        .eq("id", id)
+        .single();
+
+      if (folderError) throw folderError;
+      setFolderName(folder.name);
+
+      const { data: topicsData, error: topicsError } = await supabase
+        .from("topics")
+        .select("*")
+        .eq("folder_id", id)
+        .order("created_at", { ascending: true });
+
+      if (topicsError) throw topicsError;
+
+      const topicsWithAttachments = await Promise.all(
+        (topicsData || []).map(async (topic) => {
+          const { count } = await supabase
+            .from("attachments")
+            .select("*", { count: "exact", head: true })
+            .eq("topic_id", topic.id);
+
+          return {
+            id: topic.id,
+            title: topic.title,
+            completed: topic.completed,
+            attachments: count || 0,
+          };
+        })
+      );
+
+      setTopics(topicsWithAttachments);
+    } catch (error: any) {
+      console.error("Erro ao carregar dados:", error);
+      toast.error("Erro ao carregar dados da pasta");
+      navigate("/");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const completedCount = topics.filter((t) => t.completed).length;
   const progress = topics.length > 0 ? (completedCount / topics.length) * 100 : 0;
 
-  const handleToggleTopic = (topicId: string) => {
-    setTopics((prev) =>
-      prev.map((t) =>
-        t.id === topicId ? { ...t, completed: !t.completed } : t
-      )
-    );
-    toast.success("Status atualizado!");
-  };
+  const handleToggleTopic = async (topicId: string) => {
+    try {
+      const topic = topics.find((t) => t.id === topicId);
+      if (!topic) return;
 
-  const handleSaveTopic = (title: string) => {
-    if (editingTopic) {
+      const { error } = await supabase
+        .from("topics")
+        .update({ completed: !topic.completed })
+        .eq("id", topicId);
+
+      if (error) throw error;
+
       setTopics((prev) =>
-        prev.map((t) => (t.id === editingTopic.id ? { ...t, title } : t))
+        prev.map((t) =>
+          t.id === topicId ? { ...t, completed: !t.completed } : t
+        )
       );
-      toast.success("Tópico atualizado!");
-    } else {
-      const newTopic: Topic = {
-        id: `t${Date.now()}`,
-        title,
-        completed: false,
-        attachments: 0,
-      };
-      setTopics((prev) => [...prev, newTopic]);
-      toast.success("Tópico criado!");
+      toast.success("Status atualizado!");
+    } catch (error: any) {
+      console.error("Erro:", error);
+      toast.error("Erro ao atualizar status");
     }
-    setEditingTopic(null);
   };
 
-  const handleEditTopic = (topic: Topic) => {
-    setEditingTopic(topic);
-    setDialogOpen(true);
+  const handleSaveTopic = async (title: string) => {
+    try {
+      if (editingTopic) {
+        const { error } = await supabase
+          .from("topics")
+          .update({ title })
+          .eq("id", editingTopic.id);
+
+        if (error) throw error;
+        toast.success("Tópico atualizado!");
+      } else {
+        const { error } = await supabase
+          .from("topics")
+          .insert({ title, folder_id: id });
+
+        if (error) throw error;
+        toast.success("Tópico criado!");
+      }
+
+      fetchFolderData();
+      setEditingTopic(null);
+    } catch (error: any) {
+      console.error("Erro:", error);
+      toast.error("Erro ao salvar tópico");
+    }
   };
 
-  const handleDeleteTopic = (topicId: string) => {
-    setTopics((prev) => prev.filter((t) => t.id !== topicId));
-    toast.success("Tópico excluído!");
+  const handleDeleteTopic = async (topicId: string) => {
+    if (!confirm("Deseja realmente excluir este tópico? Todos os anexos serão perdidos.")) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase.from("topics").delete().eq("id", topicId);
+      if (error) throw error;
+
+      toast.success("Tópico excluído!");
+      fetchFolderData();
+    } catch (error: any) {
+      console.error("Erro:", error);
+      toast.error("Erro ao excluir tópico");
+    }
   };
 
-  const handleExport = () => {
-    toast.success("Exportando pasta... (funcionalidade em desenvolvimento)");
+  const openUploadDialog = (topicId: string) => {
+    setSelectedTopicId(topicId);
+    setUploadDialogOpen(true);
   };
+
+  const handleUploadComplete = () => {
+    setRefreshKey((prev) => prev + 1);
+    fetchFolderData();
+    setUploadDialogOpen(false);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center gradient-subtle">
+        <div className="text-center">
+          <div className="h-8 w-8 mx-auto mb-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+          <p className="text-muted-foreground">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen gradient-subtle">
       <div className="container max-w-4xl py-8 px-4">
         <div className="mb-6 flex items-center justify-between">
-          <Button
-            variant="ghost"
-            onClick={() => navigate("/")}
-            className="gap-2"
-          >
+          <Button variant="ghost" onClick={() => navigate("/")} className="gap-2">
             <ArrowLeft className="h-4 w-4" />
             Voltar
-          </Button>
-          
-          <Button onClick={handleExport} variant="outline" className="gap-2">
-            <Download className="h-4 w-4" />
-            Exportar
           </Button>
         </div>
 
@@ -115,7 +213,10 @@ const FolderDetails = () => {
 
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-2xl font-semibold">Tópicos</h2>
-          <Button onClick={() => { setEditingTopic(null); setDialogOpen(true); }} className="gap-2">
+          <Button 
+            onClick={() => { setEditingTopic(null); setDialogOpen(true); }} 
+            className="gap-2"
+          >
             <Plus className="h-4 w-4" />
             Novo Tópico
           </Button>
@@ -130,13 +231,30 @@ const FolderDetails = () => {
             </div>
           ) : (
             topics.map((topic) => (
-              <TopicItem
-                key={topic.id}
-                topic={topic}
-                onToggle={() => handleToggleTopic(topic.id)}
-                onEdit={() => handleEditTopic(topic)}
-                onDelete={() => handleDeleteTopic(topic.id)}
-              />
+              <div key={topic.id} className="space-y-2">
+                <div className="flex items-start gap-2">
+                  <div className="flex-1">
+                    <TopicItem
+                      topic={topic}
+                      onToggle={() => handleToggleTopic(topic.id)}
+                      onEdit={() => { setEditingTopic(topic); setDialogOpen(true); }}
+                      onDelete={() => handleDeleteTopic(topic.id)}
+                    />
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => openUploadDialog(topic.id)}
+                    className="mt-4"
+                    title="Adicionar anexos"
+                  >
+                    <Paperclip className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="ml-11">
+                  <AttachmentsList topicId={topic.id} refreshTrigger={refreshKey} />
+                </div>
+              </div>
             ))
           )}
         </div>
@@ -153,6 +271,23 @@ const FolderDetails = () => {
               : "Adicione um novo tópico à pasta."
           }
         />
+
+        <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Adicionar Anexos</DialogTitle>
+              <DialogDescription>
+                Envie arquivos PNG, PDF, CSV e outros formatos
+              </DialogDescription>
+            </DialogHeader>
+            {selectedTopicId && (
+              <FileUpload
+                topicId={selectedTopicId}
+                onUploadComplete={handleUploadComplete}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

@@ -1,10 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, FolderOpen } from "lucide-react";
+import { Plus, FolderOpen, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FolderCard } from "@/components/FolderCard";
 import { FolderDialog } from "@/components/FolderDialog";
+import { AuthForm } from "@/components/AuthForm";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import type { User, Session } from "@supabase/supabase-js";
 
 interface Folder {
   id: string;
@@ -15,62 +18,136 @@ interface Folder {
 
 const Index = () => {
   const navigate = useNavigate();
-  const [folders, setFolders] = useState<Folder[]>([
-    {
-      id: "1",
-      name: "João Silva",
-      totalTopics: 3,
-      completedTopics: 2,
-    },
-    {
-      id: "2",
-      name: "Maria Santos",
-      totalTopics: 5,
-      completedTopics: 5,
-    },
-    {
-      id: "3",
-      name: "Tech Solutions LTDA",
-      totalTopics: 4,
-      completedTopics: 1,
-    },
-  ]);
-  
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingFolder, setEditingFolder] = useState<Folder | null>(null);
 
-  const handleSaveFolder = (name: string) => {
-    if (editingFolder) {
-      setFolders((prev) =>
-        prev.map((f) => (f.id === editingFolder.id ? { ...f, name } : f))
-      );
-      toast.success("Pasta atualizada com sucesso!");
-    } else {
-      const newFolder: Folder = {
-        id: `f${Date.now()}`,
-        name,
-        totalTopics: 0,
-        completedTopics: 0,
-      };
-      setFolders((prev) => [...prev, newFolder]);
-      toast.success("Pasta criada com sucesso!");
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+      }
+    );
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      fetchFolders();
     }
-    setEditingFolder(null);
+  }, [user]);
+
+  const fetchFolders = async () => {
+    try {
+      const { data: foldersData, error: foldersError } = await supabase
+        .from("folders")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (foldersError) throw foldersError;
+
+      const foldersWithStats = await Promise.all(
+        (foldersData || []).map(async (folder) => {
+          const { data: topics, error: topicsError } = await supabase
+            .from("topics")
+            .select("completed")
+            .eq("folder_id", folder.id);
+
+          if (topicsError) throw topicsError;
+
+          return {
+            id: folder.id,
+            name: folder.name,
+            totalTopics: topics?.length || 0,
+            completedTopics: topics?.filter((t) => t.completed).length || 0,
+          };
+        })
+      );
+
+      setFolders(foldersWithStats);
+    } catch (error: any) {
+      console.error("Erro ao carregar pastas:", error);
+      toast.error("Erro ao carregar pastas");
+    }
   };
 
-  const handleEditFolder = (folder: Folder) => {
-    setEditingFolder(folder);
-    setDialogOpen(true);
+  const handleSaveFolder = async (name: string) => {
+    try {
+      if (editingFolder) {
+        const { error } = await supabase
+          .from("folders")
+          .update({ name })
+          .eq("id", editingFolder.id);
+
+        if (error) throw error;
+        toast.success("Pasta atualizada!");
+      } else {
+        const { error } = await supabase
+          .from("folders")
+          .insert({ name, user_id: user!.id });
+
+        if (error) throw error;
+        toast.success("Pasta criada!");
+      }
+
+      fetchFolders();
+      setEditingFolder(null);
+    } catch (error: any) {
+      console.error("Erro ao salvar pasta:", error);
+      toast.error(error.message || "Erro ao salvar pasta");
+    }
   };
 
-  const handleDeleteFolder = (folderId: string) => {
-    setFolders((prev) => prev.filter((f) => f.id !== folderId));
-    toast.success("Pasta excluída!");
+  const handleDeleteFolder = async (folderId: string) => {
+    if (!confirm("Deseja realmente excluir esta pasta? Todos os tópicos e anexos serão perdidos.")) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase.from("folders").delete().eq("id", folderId);
+      if (error) throw error;
+
+      toast.success("Pasta excluída!");
+      fetchFolders();
+    } catch (error: any) {
+      console.error("Erro ao excluir pasta:", error);
+      toast.error("Erro ao excluir pasta");
+    }
   };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    toast.success("Logout realizado!");
+  };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center gradient-subtle">
+        <div className="text-center">
+          <div className="h-8 w-8 mx-auto mb-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+          <p className="text-muted-foreground">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthForm />;
+  }
 
   return (
     <div className="min-h-screen gradient-subtle">
-      {/* Header */}
       <header className="border-b bg-card/50 backdrop-blur-sm">
         <div className="container mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
@@ -81,23 +158,28 @@ const Index = () => {
               <div>
                 <h1 className="text-2xl font-bold">Organizador de Pastas</h1>
                 <p className="text-sm text-muted-foreground">
-                  Gerencie seus documentos com eficiência
+                  Bem-vindo, {user.email}
                 </p>
               </div>
             </div>
             
-            <Button 
-              onClick={() => { setEditingFolder(null); setDialogOpen(true); }} 
-              className="gap-2 shadow-lg"
-            >
-              <Plus className="h-4 w-4" />
-              Nova Pasta
-            </Button>
+            <div className="flex gap-3">
+              <Button 
+                onClick={() => { setEditingFolder(null); setDialogOpen(true); }} 
+                className="gap-2 shadow-lg"
+              >
+                <Plus className="h-4 w-4" />
+                Nova Pasta
+              </Button>
+              <Button variant="outline" onClick={handleLogout} className="gap-2">
+                <LogOut className="h-4 w-4" />
+                Sair
+              </Button>
+            </div>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         <div className="mb-6">
           <h2 className="mb-2 text-xl font-semibold">Suas Pastas</h2>
@@ -131,7 +213,7 @@ const Index = () => {
                 key={folder.id}
                 {...folder}
                 onClick={() => navigate(`/folder/${folder.id}`)}
-                onEdit={() => handleEditFolder(folder)}
+                onEdit={() => { setEditingFolder(folder); setDialogOpen(true); }}
                 onDelete={() => handleDeleteFolder(folder.id)}
               />
             ))}
