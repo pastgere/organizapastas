@@ -167,9 +167,25 @@ const FolderDetails = () => {
     setUploadDialogOpen(true);
   };
 
-  const handleUploadComplete = () => {
+  const handleUploadComplete = async () => {
     setRefreshKey((prev) => prev + 1);
-    fetchFolderData();
+    
+    // Atualizar apenas o tópico específico sem reordenar a lista
+    if (selectedTopicId) {
+      const { count } = await supabase
+        .from("attachments")
+        .select("*", { count: "exact", head: true })
+        .eq("topic_id", selectedTopicId);
+
+      setTopics((prev) =>
+        prev.map((t) =>
+          t.id === selectedTopicId
+            ? { ...t, completed: true, attachments: count || 0 }
+            : t
+        )
+      );
+    }
+    
     setUploadDialogOpen(false);
   };
 
