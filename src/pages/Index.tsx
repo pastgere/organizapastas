@@ -4,6 +4,7 @@ import { Plus, FolderOpen, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FolderCard } from "@/components/FolderCard";
 import { FolderDialog } from "@/components/FolderDialog";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { AuthForm } from "@/components/AuthForm";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { supabase } from "@/integrations/supabase/client";
@@ -51,6 +52,8 @@ const Index = () => {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingFolder, setEditingFolder] = useState<Folder | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [folderToDelete, setFolderToDelete] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -152,13 +155,16 @@ const Index = () => {
     }
   };
 
-  const handleDeleteFolder = async (folderId: string) => {
-    if (!confirm("Deseja realmente excluir esta pasta? Todos os tópicos e anexos serão perdidos.")) {
-      return;
-    }
+  const handleDeleteFolder = async (folderId: string, folderName: string) => {
+    setFolderToDelete({ id: folderId, name: folderName });
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteFolder = async () => {
+    if (!folderToDelete) return;
 
     try {
-      const { error } = await supabase.from("folders").delete().eq("id", folderId);
+      const { error } = await supabase.from("folders").delete().eq("id", folderToDelete.id);
       if (error) throw error;
 
       toast.success("Pasta excluída!");
@@ -166,6 +172,8 @@ const Index = () => {
     } catch (error: any) {
       console.error("Erro ao excluir pasta:", error);
       toast.error("Erro ao excluir pasta");
+    } finally {
+      setFolderToDelete(null);
     }
   };
 
@@ -279,7 +287,7 @@ const Index = () => {
                 {...folder}
                 onClick={() => navigate(`/folder/${folder.id}`)}
                 onEdit={() => { setEditingFolder(folder); setDialogOpen(true); }}
-                onDelete={() => handleDeleteFolder(folder.id)}
+                onDelete={() => handleDeleteFolder(folder.id, folder.name)}
                 onDownload={() => handleDownloadFolder(folder.id, folder.name)}
               />
             ))}
@@ -298,6 +306,16 @@ const Index = () => {
             ? "Atualize o nome da pasta."
             : "Crie uma nova pasta personalizada para organizar documentos."
         }
+      />
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={confirmDeleteFolder}
+        title="Excluir Pasta"
+        description={`Deseja realmente excluir a pasta "${folderToDelete?.name}"? Todos os tópicos e anexos serão perdidos permanentemente.`}
+        confirmText="Excluir"
+        cancelText="Cancelar"
       />
     </div>
   );

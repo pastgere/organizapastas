@@ -4,6 +4,7 @@ import { ArrowLeft, Plus, Download, Paperclip, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TopicItem, Topic } from "@/components/TopicItem";
 import { TopicDialog } from "@/components/TopicDialog";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { FileUpload } from "@/components/FileUpload";
 import { AttachmentsList } from "@/components/AttachmentsList";
 import { Progress } from "@/components/ui/progress";
@@ -30,6 +31,8 @@ const FolderDetails = () => {
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   const [editingTopic, setEditingTopic] = useState<Topic | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [topicToDelete, setTopicToDelete] = useState<{ id: string; title: string } | null>(null);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -156,13 +159,16 @@ const FolderDetails = () => {
     }
   };
 
-  const handleDeleteTopic = async (topicId: string) => {
-    if (!confirm("Deseja realmente excluir este tópico? Todos os anexos serão perdidos.")) {
-      return;
-    }
+  const handleDeleteTopic = async (topicId: string, topicTitle: string) => {
+    setTopicToDelete({ id: topicId, title: topicTitle });
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteTopic = async () => {
+    if (!topicToDelete) return;
 
     try {
-      const { error } = await supabase.from("topics").delete().eq("id", topicId);
+      const { error } = await supabase.from("topics").delete().eq("id", topicToDelete.id);
       if (error) throw error;
 
       toast.success("Tópico excluído!");
@@ -170,6 +176,8 @@ const FolderDetails = () => {
     } catch (error: any) {
       console.error("Erro:", error);
       toast.error("Erro ao excluir tópico");
+    } finally {
+      setTopicToDelete(null);
     }
   };
 
@@ -276,7 +284,7 @@ const FolderDetails = () => {
                       topic={topic}
                       onToggle={() => handleToggleTopic(topic.id)}
                       onEdit={() => { setEditingTopic(topic); setDialogOpen(true); }}
-                      onDelete={() => handleDeleteTopic(topic.id)}
+                      onDelete={() => handleDeleteTopic(topic.id, topic.title)}
                     />
                   </div>
                   <Button
@@ -338,6 +346,16 @@ const FolderDetails = () => {
             )}
           </DialogContent>
         </Dialog>
+
+        <ConfirmDialog
+          open={deleteDialogOpen}
+          onOpenChange={setDeleteDialogOpen}
+          onConfirm={confirmDeleteTopic}
+          title="Excluir Tópico"
+          description={`Deseja realmente excluir o tópico "${topicToDelete?.title}"? Todos os anexos serão perdidos permanentemente.`}
+          confirmText="Excluir"
+          cancelText="Cancelar"
+        />
       </div>
     </div>
   );
