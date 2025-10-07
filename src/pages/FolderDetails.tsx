@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Plus, Download, Paperclip } from "lucide-react";
+import { ArrowLeft, Plus, Download, Paperclip, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TopicItem, Topic } from "@/components/TopicItem";
 import { TopicDialog } from "@/components/TopicDialog";
@@ -208,6 +208,17 @@ const FolderDetails = () => {
             <ArrowLeft className="h-4 w-4" />
             Voltar
           </Button>
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              fetchFolderData();
+              toast.success("Atualizado!");
+            }} 
+            className="gap-2"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Atualizar
+          </Button>
         </div>
 
         <div className="mb-8 rounded-2xl bg-card p-6 shadow-[var(--shadow-card)]">
@@ -268,7 +279,11 @@ const FolderDetails = () => {
                   </Button>
                 </div>
                 <div className="ml-11">
-                  <AttachmentsList topicId={topic.id} refreshTrigger={refreshKey} />
+                  <AttachmentsList 
+                    topicId={topic.id} 
+                    refreshTrigger={refreshKey}
+                    onAttachmentDeleted={() => fetchFolderData()}
+                  />
                 </div>
               </div>
             ))

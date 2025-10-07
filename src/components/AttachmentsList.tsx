@@ -17,9 +17,10 @@ interface Attachment {
 interface AttachmentsListProps {
   topicId: string;
   refreshTrigger?: number;
+  onAttachmentDeleted?: () => void;
 }
 
-export const AttachmentsList = ({ topicId, refreshTrigger }: AttachmentsListProps) => {
+export const AttachmentsList = ({ topicId, refreshTrigger, onAttachmentDeleted }: AttachmentsListProps) => {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [loading, setLoading] = useState(true);
   const [previewFile, setPreviewFile] = useState<Attachment | null>(null);
@@ -76,7 +77,7 @@ export const AttachmentsList = ({ topicId, refreshTrigger }: AttachmentsListProp
   };
 
   const handleDelete = async (attachment: Attachment) => {
-    if (!confirm(`Deseja realmente excluir "${attachment.file_name}"?`)) return;
+    if (!confirm(`Tem certeza que deseja excluir o arquivo "${attachment.file_name}"?`)) return;
 
     try {
       const { error: storageError } = await supabase.storage
@@ -93,7 +94,23 @@ export const AttachmentsList = ({ topicId, refreshTrigger }: AttachmentsListProp
       if (dbError) throw dbError;
 
       toast.success("Arquivo excluído!");
+      
+      // Verificar se ainda há anexos restantes
+      const { count } = await supabase
+        .from("attachments")
+        .select("*", { count: "exact", head: true })
+        .eq("topic_id", topicId);
+
+      // Se não houver mais anexos, desmarcar o tópico como concluído
+      if (count === 0) {
+        await supabase
+          .from("topics")
+          .update({ completed: false })
+          .eq("id", topicId);
+      }
+
       fetchAttachments();
+      onAttachmentDeleted?.();
     } catch (error: any) {
       console.error("Erro ao excluir:", error);
       toast.error("Erro ao excluir arquivo");
