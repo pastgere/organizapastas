@@ -5,10 +5,36 @@ import { Button } from "@/components/ui/button";
 import { FolderCard } from "@/components/FolderCard";
 import { FolderDialog } from "@/components/FolderDialog";
 import { AuthForm } from "@/components/AuthForm";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { User, Session } from "@supabase/supabase-js";
 import { downloadFolderAsZip } from "@/utils/downloadFolder";
+
+const DEFAULT_TOPICS = [
+  "Registro de Imóvel",
+  "Recibo CAR",
+  "DCAA",
+  "CCIR",
+  "DAP",
+  "Ficha Sanitária",
+  "Documento de Identidade",
+  "Comprovante de residência",
+  "Comprovante de Renda",
+  "Certidão de casamento",
+  "Documento de identidade do cônjuge",
+  "Comprovante de renda do Cônjuge",
+  "Declaração Consolidada",
+  "Declaração de Não desmatamento Irregular",
+  "Declaração de Regularidade Ambiental",
+  "Autorização de Modificação no Projeto",
+  "Contrato Particular de Prestação de Assessoria Empresarial e Técnica",
+  "Documento de Identidade do Avalista",
+  "Comprovante de residência do Avalista",
+  "Comprovante de renda do Avalista",
+  "Certidão de casamento do Avalista",
+  "Comprovante de renda do cônjuge do avalista",
+];
 
 interface Folder {
   id: string;
@@ -94,12 +120,28 @@ const Index = () => {
         if (error) throw error;
         toast.success("Pasta atualizada!");
       } else {
-        const { error } = await supabase
+        const { data: newFolder, error: folderError } = await supabase
           .from("folders")
-          .insert({ name, user_id: user!.id });
+          .insert({ name, user_id: user!.id })
+          .select()
+          .single();
 
-        if (error) throw error;
-        toast.success("Pasta criada!");
+        if (folderError) throw folderError;
+
+        // Criar tópicos padrão
+        const topicsToInsert = DEFAULT_TOPICS.map((title) => ({
+          title,
+          folder_id: newFolder.id,
+          completed: false,
+        }));
+
+        const { error: topicsError } = await supabase
+          .from("topics")
+          .insert(topicsToInsert);
+
+        if (topicsError) throw topicsError;
+
+        toast.success("Pasta criada com tópicos padrão!");
       }
 
       fetchFolders();
@@ -186,6 +228,7 @@ const Index = () => {
             </div>
             
             <div className="flex gap-3">
+              <ThemeToggle />
               <Button 
                 onClick={() => { setEditingFolder(null); setDialogOpen(true); }} 
                 className="gap-2 shadow-lg"

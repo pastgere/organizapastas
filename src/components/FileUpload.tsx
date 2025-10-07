@@ -89,6 +89,14 @@ export const FileUpload = ({ topicId, onUploadComplete }: FileUploadProps) => {
         if (dbError) throw dbError;
       }
 
+      // Marcar o tópico como concluído
+      const { error: updateError } = await supabase
+        .from("topics")
+        .update({ completed: true })
+        .eq("id", topicId);
+
+      if (updateError) throw updateError;
+
       toast.success(`${selectedFiles.length} arquivo(s) enviado(s) com sucesso!`);
       setSelectedFiles([]);
       onUploadComplete();
