@@ -313,7 +313,11 @@ const Index = () => {
         onOpenChange={setDeleteDialogOpen}
         onConfirm={confirmDeleteFolder}
         title="Excluir Pasta"
-        description={`Tem certeza que deseja excluir a pasta "${folderToDelete?.name}"? Esta ação não pode ser desfeita.`}
+        description={
+          <>
+            Tem certeza que deseja excluir a pasta <strong>"{folderToDelete?.name}"</strong>? Esta ação não pode ser desfeita.
+          </>
+        }
         confirmText="Excluir"
         cancelText="Cancelar"
         variant="destructive"
