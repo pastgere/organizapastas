@@ -313,9 +313,10 @@ const Index = () => {
         onOpenChange={setDeleteDialogOpen}
         onConfirm={confirmDeleteFolder}
         title="Excluir Pasta"
-        description={`Deseja realmente excluir a pasta "${folderToDelete?.name}"? Todos os tópicos e anexos serão perdidos permanentemente.`}
+        description={`Tem certeza que deseja excluir a pasta "${folderToDelete?.name}"? Esta ação não pode ser desfeita.`}
         confirmText="Excluir"
         cancelText="Cancelar"
+        variant="destructive"
       />
     </div>
   );

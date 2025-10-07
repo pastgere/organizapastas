@@ -8,6 +8,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { buttonVariants } from "@/components/ui/button";
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -17,6 +18,7 @@ interface ConfirmDialogProps {
   description: string;
   confirmText?: string;
   cancelText?: string;
+  variant?: "default" | "destructive";
 }
 
 export const ConfirmDialog = ({
@@ -27,6 +29,7 @@ export const ConfirmDialog = ({
   description,
   confirmText = "Confirmar",
   cancelText = "Cancelar",
+  variant = "default",
 }: ConfirmDialogProps) => {
   const handleConfirm = () => {
     onConfirm();
@@ -42,7 +45,10 @@ export const ConfirmDialog = ({
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>{cancelText}</AlertDialogCancel>
-          <AlertDialogAction onClick={handleConfirm}>
+          <AlertDialogAction 
+            onClick={handleConfirm}
+            className={variant === "destructive" ? buttonVariants({ variant: "destructive" }) : ""}
+          >
             {confirmText}
           </AlertDialogAction>
         </AlertDialogFooter>

@@ -352,9 +352,10 @@ const FolderDetails = () => {
           onOpenChange={setDeleteDialogOpen}
           onConfirm={confirmDeleteTopic}
           title="Excluir Tópico"
-          description={`Deseja realmente excluir o tópico "${topicToDelete?.title}"? Todos os anexos serão perdidos permanentemente.`}
+          description={`Tem certeza que deseja excluir o tópico "${topicToDelete?.title}"? Esta ação não pode ser desfeita.`}
           confirmText="Excluir"
           cancelText="Cancelar"
+          variant="destructive"
         />
       </div>
     </div>
