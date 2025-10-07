@@ -61,7 +61,7 @@ const FolderDetails = () => {
         .from("topics")
         .select("*")
         .eq("folder_id", id)
-        .order("created_at", { ascending: true });
+        .order("position", { ascending: true });
 
       if (topicsError) throw topicsError;
 
@@ -129,9 +129,20 @@ const FolderDetails = () => {
         if (error) throw error;
         toast.success("Tópico atualizado!");
       } else {
+        // Get the max position for this folder to append new topic at end
+        const { data: maxData } = await supabase
+          .from("topics")
+          .select("position")
+          .eq("folder_id", id)
+          .order("position", { ascending: false })
+          .limit(1)
+          .single();
+
+        const nextPosition = (maxData?.position || 0) + 1;
+
         const { error } = await supabase
           .from("topics")
-          .insert({ title, folder_id: id });
+          .insert({ title, folder_id: id, position: nextPosition });
 
         if (error) throw error;
         toast.success("Tópico criado!");
