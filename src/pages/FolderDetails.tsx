@@ -282,7 +282,15 @@ const FolderDetails = () => {
                   <AttachmentsList 
                     topicId={topic.id} 
                     refreshTrigger={refreshKey}
-                    onAttachmentDeleted={() => fetchFolderData()}
+                    onAttachmentDeleted={(topicId, hasAttachments) => {
+                      setTopics((prev) =>
+                        prev.map((t) =>
+                          t.id === topicId
+                            ? { ...t, completed: hasAttachments, attachments: hasAttachments ? t.attachments - 1 : 0 }
+                            : t
+                        )
+                      );
+                    }}
                   />
                 </div>
               </div>

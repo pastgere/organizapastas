@@ -1,6 +1,16 @@
 import { useState, useEffect } from "react";
 import { FileText, Image as ImageIcon, File, Download, Trash2, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { FilePreview } from "./FilePreview";
@@ -17,13 +27,15 @@ interface Attachment {
 interface AttachmentsListProps {
   topicId: string;
   refreshTrigger?: number;
-  onAttachmentDeleted?: () => void;
+  onAttachmentDeleted?: (topicId: string, hasAttachments: boolean) => void;
 }
 
 export const AttachmentsList = ({ topicId, refreshTrigger, onAttachmentDeleted }: AttachmentsListProps) => {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [loading, setLoading] = useState(true);
   const [previewFile, setPreviewFile] = useState<Attachment | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [attachmentToDelete, setAttachmentToDelete] = useState<Attachment | null>(null);
 
   const fetchAttachments = async () => {
     try {
@@ -76,41 +88,39 @@ export const AttachmentsList = ({ topicId, refreshTrigger, onAttachmentDeleted }
     }
   };
 
-  const handleDelete = async (attachment: Attachment) => {
-    if (!confirm(`Tem certeza que deseja excluir o arquivo "${attachment.file_name}"?`)) return;
+  const openDeleteDialog = (attachment: Attachment) => {
+    setAttachmentToDelete(attachment);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!attachmentToDelete) return;
 
     try {
       const { error: storageError } = await supabase.storage
         .from("attachments")
-        .remove([attachment.file_path]);
+        .remove([attachmentToDelete.file_path]);
 
       if (storageError) throw storageError;
 
       const { error: dbError } = await supabase
         .from("attachments")
         .delete()
-        .eq("id", attachment.id);
+        .eq("id", attachmentToDelete.id);
 
       if (dbError) throw dbError;
 
       toast.success("Arquivo excluído!");
       
-      // Verificar se ainda há anexos restantes
-      const { count } = await supabase
-        .from("attachments")
-        .select("*", { count: "exact", head: true })
-        .eq("topic_id", topicId);
+      // Atualizar lista local
+      const newAttachments = attachments.filter(a => a.id !== attachmentToDelete.id);
+      setAttachments(newAttachments);
 
-      // Se não houver mais anexos, desmarcar o tópico como concluído
-      if (count === 0) {
-        await supabase
-          .from("topics")
-          .update({ completed: false })
-          .eq("id", topicId);
-      }
-
-      fetchAttachments();
-      onAttachmentDeleted?.();
+      // Notificar o pai sobre a exclusão e se ainda há anexos
+      onAttachmentDeleted?.(topicId, newAttachments.length > 0);
+      
+      setDeleteDialogOpen(false);
+      setAttachmentToDelete(null);
     } catch (error: any) {
       console.error("Erro ao excluir:", error);
       toast.error("Erro ao excluir arquivo");
@@ -166,7 +176,7 @@ export const AttachmentsList = ({ topicId, refreshTrigger, onAttachmentDeleted }
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => handleDelete(attachment)}
+                  onClick={() => openDeleteDialog(attachment)}
                   className="h-8 w-8 text-destructive hover:text-destructive"
                   title="Excluir"
                 >
@@ -187,6 +197,30 @@ export const AttachmentsList = ({ topicId, refreshTrigger, onAttachmentDeleted }
           fileType={previewFile.file_type}
         />
       )}
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir arquivo</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir o arquivo{" "}
+              <span className="font-semibold text-foreground">
+                "{attachmentToDelete?.file_name}"
+              </span>
+              ? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };
