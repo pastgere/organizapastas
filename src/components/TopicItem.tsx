@@ -37,10 +37,7 @@ export const TopicItem = ({ topic, onToggle, onEdit, onDelete }: TopicItemProps)
       </button>
 
       <div className="flex-1 min-w-0">
-        <p className={cn(
-          "font-medium transition-all",
-          topic.completed && "line-through text-muted-foreground"
-        )}>
+        <p className="font-medium transition-all">
           {topic.title}
         </p>
         {topic.attachments !== undefined && topic.attachments > 0 && (
