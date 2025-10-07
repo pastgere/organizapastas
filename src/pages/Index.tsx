@@ -315,7 +315,7 @@ const Index = () => {
         title="Excluir Pasta"
         description={
           <>
-            Tem certeza que deseja excluir a pasta <strong>"{folderToDelete?.name}"</strong>? Esta ação não pode ser desfeita.
+            Tem certeza que deseja excluir a pasta <span className="font-semibold text-foreground">"{folderToDelete?.name}"</span>? Esta ação não pode ser desfeita.
           </>
         }
         confirmText="Excluir"

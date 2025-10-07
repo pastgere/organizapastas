@@ -354,7 +354,7 @@ const FolderDetails = () => {
           title="Excluir Tópico"
           description={
             <>
-              Tem certeza que deseja excluir o tópico <strong>"{topicToDelete?.title}"</strong>? Esta ação não pode ser desfeita.
+              Tem certeza que deseja excluir o tópico <span className="font-semibold text-foreground">"{topicToDelete?.title}"</span>? Esta ação não pode ser desfeita.
             </>
           }
           confirmText="Excluir"
